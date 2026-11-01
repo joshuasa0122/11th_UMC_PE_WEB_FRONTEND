@@ -45,6 +45,29 @@ export const movieQueries = {
 
 </details>
 
+### ⚡ 이슈 No.1 — `pnpm add`가 아무 출력 없이 멈춤
+
+**`이슈`**
+
+👉 `pnpm add @tanstack/react-query @tanstack/react-query-devtools`를 실행했더니 2분이 넘도록 오류도 진행 상황도 출력되지 않았다. 확인해 보니 `package.json`에 패키지가 추가되지 않았고 `node_modules/@tanstack` 폴더도 없었다. 그런데 `pnpm add` 프로세스는 계속 살아 있었다.
+
+**`원인`**
+
+👉 현재 작업 환경의 샌드박스가 npm 레지스트리로 나가는 네트워크를 막고 있어서, pnpm이 패키지 메타데이터 응답을 끝없이 기다렸다. 실패해서 오류를 낸 게 아니라 응답을 기다리며 멈춘 상태라 아무것도 출력되지 않았다. 같은 명령을 샌드박스 밖에서 실행하자 0.3초 만에 설치가 끝나 네트워크 제한이 원인임을 확인했다.
+
+**`해결`**
+
+👉 멈춘 프로세스를 종료하고 같은 명령을 샌드박스 밖에서 `--reporter=append-only`를 붙여 다시 실행했다. 이 옵션을 쓰면 진행 로그가 한 줄씩 그대로 남아 어디서 멈췄는지 보인다. `@tanstack/react-query`와 `@tanstack/react-query-devtools` 5.105.0이 설치됐고, `pnpm build`, `pnpm lint`, `pnpm test`가 모두 통과했다.
+
+**`배운 점`**
+
+👉 설치 명령이 출력 없이 멈추면 먼저 `package.json`과 `node_modules`가 바뀌었는지 확인해 실제로 진행되고 있는지 판단한다. 진행 로그를 남기는 옵션(`--reporter=append-only`)으로 다시 실행해 멈춘 단계를 찾는다. 오류 메시지가 없는 멈춤은 코드보다 네트워크나 레지스트리 접근부터 의심한다.
+
+**`참고 레퍼런스`**
+
+- [pnpm 공식 문서 — pnpm add](https://pnpm.io/cli/add)
+- [pnpm 공식 문서 — pnpm install의 --reporter 옵션](https://pnpm.io/cli/install)
+
 ## Zustand · Web Storage 미션
 
 <details open>
