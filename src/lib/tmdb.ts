@@ -1,6 +1,5 @@
 import ky, { HTTPError } from 'ky'
 import { queryOptions } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
 import type { Movie } from '../types/movie'
 
 export const tmdb = ky.create({
@@ -64,33 +63,4 @@ export const movieQueries = {
     queryKey: ['movies', 'detail', movieId],
     queryFn: ({ signal }) => get<TmdbMovie>(`movie/${encodeURIComponent(movieId)}`, {}, signal),
   }),
-}
-
-type TmdbState<T> =
-  | { status: 'loading' }
-  | { status: 'error'; notFound: boolean; retry: () => void }
-  | { status: 'success'; data: T }
-
-export function useTmdb<T>(path: string, params: Record<string, string> = {}): TmdbState<T> {
-  const searchParams = new URLSearchParams({ language: 'ko-KR', ...params }).toString()
-  const [attempt, setAttempt] = useState(0)
-  const key = `${path}?${searchParams}#${attempt}`
-  const [result, setResult] = useState<{ key: string; data?: T; error?: unknown }>()
-
-  useEffect(() => {
-    const controller = new AbortController()
-    tmdb.get(path, { searchParams, signal: controller.signal }).json<T>().then(
-      (data) => setResult({ key, data }),
-      (error) => { if (!controller.signal.aborted) setResult({ key, error }) },
-    )
-    return () => controller.abort()
-  }, [key, path, searchParams])
-
-  if (result?.key !== key) return { status: 'loading' }
-  if (result.error) return {
-    status: 'error',
-    notFound: result.error instanceof HTTPError && result.error.response.status === 404,
-    retry: () => setAttempt((count) => count + 1),
-  }
-  return { status: 'success', data: result.data as T }
 }

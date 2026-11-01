@@ -1,7 +1,8 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { StatusMessage } from '../components/status-message'
-import { toMovie, useTmdb, type TmdbPage } from '../lib/tmdb'
+import { movieQueries, toMovie } from '../lib/tmdb'
 import { useBookmarkStore } from '../stores/bookmark-store'
 
 export function SearchPage() {
@@ -49,14 +50,14 @@ function SearchContent({ query }: { query: string }) {
 }
 
 function SearchResults({ query }: { query: string }) {
-  const state = useTmdb<TmdbPage>('search/movie', { query })
+  const { data, isPending, isError, refetch } = useQuery(movieQueries.search(query))
   const bookmarkedIds = useBookmarkStore((state) => state.bookmarkedIds)
   const toggleBookmark = useBookmarkStore((state) => state.toggleBookmark)
 
-  if (state.status === 'loading') return <StatusMessage>‘{query}’ 검색 중이에요...</StatusMessage>
-  if (state.status === 'error') return <StatusMessage error onRetry={state.retry}>검색 결과를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</StatusMessage>
-  const results = state.data.results.map(toMovie)
-  const total = state.data.total_results
+  if (isPending) return <StatusMessage>‘{query}’ 검색 중이에요...</StatusMessage>
+  if (isError) return <StatusMessage error onRetry={() => refetch()}>검색 결과를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</StatusMessage>
+  const results = data.results.map(toMovie)
+  const total = data.total_results
 
   return (
     <>
