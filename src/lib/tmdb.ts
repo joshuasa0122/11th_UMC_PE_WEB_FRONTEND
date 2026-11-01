@@ -1,5 +1,5 @@
 import ky, { HTTPError } from 'ky'
-import { useEffect, useState } from 'react'
+import { queryOptions } from '@tanstack/react-query'
 import type { Movie } from '../types/movie'
 
 export const tmdb = ky.create({
@@ -45,31 +45,22 @@ export function toMovie(movie: TmdbMovie): Movie {
   }
 }
 
-type TmdbState<T> =
-  | { status: 'loading' }
-  | { status: 'error'; notFound: boolean; retry: () => void }
-  | { status: 'success'; data: T }
+const get = <T>(path: string, params: Record<string, string>, signal: AbortSignal) =>
+  tmdb.get(path, { searchParams: { language: 'ko-KR', ...params }, signal }).json<T>()
 
-export function useTmdb<T>(path: string, params: Record<string, string> = {}): TmdbState<T> {
-  const searchParams = new URLSearchParams({ language: 'ko-KR', ...params }).toString()
-  const [attempt, setAttempt] = useState(0)
-  const key = `${path}?${searchParams}#${attempt}`
-  const [result, setResult] = useState<{ key: string; data?: T; error?: unknown }>()
+export const isNotFound = (error: unknown) => error instanceof HTTPError && error.response.status === 404
 
-  useEffect(() => {
-    const controller = new AbortController()
-    tmdb.get(path, { searchParams, signal: controller.signal }).json<T>().then(
-      (data) => setResult({ key, data }),
-      (error) => { if (!controller.signal.aborted) setResult({ key, error }) },
-    )
-    return () => controller.abort()
-  }, [key, path, searchParams])
-
-  if (result?.key !== key) return { status: 'loading' }
-  if (result.error) return {
-    status: 'error',
-    notFound: result.error instanceof HTTPError && result.error.response.status === 404,
-    retry: () => setAttempt((count) => count + 1),
-  }
-  return { status: 'success', data: result.data as T }
+export const movieQueries = {
+  popular: (page: number) => queryOptions({
+    queryKey: ['movies', 'popular', page],
+    queryFn: ({ signal }) => get<TmdbPage>('movie/popular', { page: String(page) }, signal),
+  }),
+  search: (query: string) => queryOptions({
+    queryKey: ['movies', 'search', query],
+    queryFn: ({ signal }) => get<TmdbPage>('search/movie', { query }, signal),
+  }),
+  detail: (movieId: string) => queryOptions({
+    queryKey: ['movies', 'detail', movieId],
+    queryFn: ({ signal }) => get<TmdbMovie>(`movie/${encodeURIComponent(movieId)}`, {}, signal),
+  }),
 }

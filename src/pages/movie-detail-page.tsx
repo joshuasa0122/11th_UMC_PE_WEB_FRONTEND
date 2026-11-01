@@ -1,29 +1,30 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { StatusMessage } from '../components/status-message'
 import { cn } from '../lib/cn'
-import { toMovie, useTmdb, type TmdbMovie } from '../lib/tmdb'
+import { isNotFound, movieQueries, toMovie } from '../lib/tmdb'
 import { useBookmarkStore } from '../stores/bookmark-store'
 
 export function MovieDetailPage() {
   const { movieId = '' } = useParams()
-  const state = useTmdb<TmdbMovie>(`movie/${encodeURIComponent(movieId)}`)
+  const { data, error, isPending, refetch } = useQuery(movieQueries.detail(movieId))
   const isBookmarked = useBookmarkStore((state) => state.bookmarkedIds.includes(Number(movieId)))
   const toggleBookmark = useBookmarkStore((state) => state.toggleBookmark)
   const [rating, setRating] = useState(() => typeof window === 'undefined' ? 0 : Number(localStorage.getItem(`umcine-rating-${movieId}`) ?? 0))
   const [review, setReview] = useState(() => typeof window === 'undefined' ? '' : localStorage.getItem(`umcine-review-${movieId}`) ?? '')
   const [saved, setSaved] = useState(false)
 
-  if (state.status !== 'success') return (
+  if (!data) return (
     <main className="mx-auto w-full max-w-[1060px] flex-1 px-5 py-10 min-[651px]:px-[58px]">
-      {state.status === 'loading' && <StatusMessage>영화 정보를 불러오는 중이에요...</StatusMessage>}
-      {state.status === 'error' && (state.notFound
+      {isPending && <StatusMessage>영화 정보를 불러오는 중이에요...</StatusMessage>}
+      {error && (isNotFound(error)
         ? <StatusMessage>영화를 찾을 수 없어요.</StatusMessage>
-        : <StatusMessage error onRetry={state.retry}>영화 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</StatusMessage>)}
+        : <StatusMessage error onRetry={() => refetch()}>영화 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</StatusMessage>)}
     </main>
   )
 
-  const movie = toMovie(state.data)
+  const movie = toMovie(data)
   const meta = [...movie.genres, movie.runtime].filter(Boolean).join(' · ')
 
   return (

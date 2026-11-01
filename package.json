@@ -11,6 +11,8 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.105.0",
+    "@tanstack/react-query-devtools": "^5.105.0",
     "ky": "^2.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

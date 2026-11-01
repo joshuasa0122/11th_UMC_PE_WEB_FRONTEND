@@ -1,5 +1,50 @@
 # UMCine 영화 페이지 미션 기록
 
+## TanStack Query 미션
+
+<details open>
+<summary>필수 미션</summary>
+
+직접 만든 `useTmdb`(useEffect + useState)를 지우고 목록·검색·상세 요청을 `useQuery`로 바꿨습니다. `main.tsx`에 `QueryClientProvider`와 `ReactQueryDevtools`를 추가했습니다. `staleTime`은 5분으로 설정해 화면을 다시 열면 요청 없이 캐시를 사용하고, 404는 재시도하지 않습니다.
+
+| 화면 | query key | 요청 |
+| --- | --- | --- |
+| 목록 | `['movies', 'popular', page]` | `movie/popular?page=` |
+| 검색 | `['movies', 'search', query]` | `search/movie?query=` |
+| 상세 | `['movies', 'detail', movieId]` | `movie/:movieId` |
+
+상태 표시 (`src/pages/movie-list-page.tsx` 발췌):
+
+```tsx
+const { data, isPending, isError, refetch } = useQuery(movieQueries.popular(page))
+
+{isPending && <StatusMessage>영화 목록을 불러오는 중이에요...</StatusMessage>}
+{isError && <StatusMessage error onRetry={() => refetch()}>영화 목록을 불러오지 못했어요...</StatusMessage>}
+{data && (data.results.length ? <MovieGrid ... /> : <StatusMessage>표시할 영화가 없어요.</StatusMessage>)}
+```
+
+확인 결과: `pnpm build`, `pnpm lint`, `pnpm test` 통과. 브라우저에서 1페이지 → 2페이지 → 1페이지로 이동했을 때 Query 개발자 도구에 키 3개가 따로 쌓이고, Network 패널에 1페이지 요청이 다시 나가지 않는지 직접 확인해 캡처해 주세요.
+
+</details>
+
+<details>
+<summary>선택 미션</summary>
+
+query key와 queryFn을 `queryOptions`로 한곳(`src/lib/tmdb.ts`)에 모았습니다. 화면에서는 `useQuery(movieQueries.detail(movieId))`처럼 호출만 하고, 응답 타입도 queryFn에서 추론됩니다.
+
+```ts
+export const movieQueries = {
+  popular: (page: number) => queryOptions({
+    queryKey: ['movies', 'popular', page],
+    queryFn: ({ signal }) => get<TmdbPage>('movie/popular', { page: String(page) }, signal),
+  }),
+  search: (query: string) => queryOptions({ queryKey: ['movies', 'search', query], ... }),
+  detail: (movieId: string) => queryOptions({ queryKey: ['movies', 'detail', movieId], ... }),
+}
+```
+
+</details>
+
 ## Zustand · Web Storage 미션
 
 <details open>
