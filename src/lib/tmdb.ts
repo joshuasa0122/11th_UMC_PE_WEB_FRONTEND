@@ -1,4 +1,5 @@
 import ky, { HTTPError } from 'ky'
+import { queryOptions } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import type { Movie } from '../types/movie'
 
@@ -43,6 +44,26 @@ export function toMovie(movie: TmdbMovie): Movie {
     tagline: movie.tagline ?? '',
     overview: movie.overview || '등록된 줄거리가 없어요.',
   }
+}
+
+const get = <T>(path: string, params: Record<string, string>, signal: AbortSignal) =>
+  tmdb.get(path, { searchParams: { language: 'ko-KR', ...params }, signal }).json<T>()
+
+export const isNotFound = (error: unknown) => error instanceof HTTPError && error.response.status === 404
+
+export const movieQueries = {
+  popular: (page: number) => queryOptions({
+    queryKey: ['movies', 'popular', page],
+    queryFn: ({ signal }) => get<TmdbPage>('movie/popular', { page: String(page) }, signal),
+  }),
+  search: (query: string) => queryOptions({
+    queryKey: ['movies', 'search', query],
+    queryFn: ({ signal }) => get<TmdbPage>('search/movie', { query }, signal),
+  }),
+  detail: (movieId: string) => queryOptions({
+    queryKey: ['movies', 'detail', movieId],
+    queryFn: ({ signal }) => get<TmdbMovie>(`movie/${encodeURIComponent(movieId)}`, {}, signal),
+  }),
 }
 
 type TmdbState<T> =
