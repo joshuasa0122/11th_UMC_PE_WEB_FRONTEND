@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link } from '@tanstack/react-router'
 import { cn } from '../lib/cn'
 
 interface PaginationProps {
@@ -16,7 +16,8 @@ export function Pagination({ currentPage, totalPages }: PaginationProps) {
         {pages.map((page) => (
           <li key={page}>
             <Link
-              to={`?page=${page}`}
+              to="/"
+              search={page > 1 ? { page } : {}}
               className={cn('grid h-[27px] min-w-[27px] place-items-center rounded px-1 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f73dc]', page === currentPage ? 'bg-[#2f73dc] font-bold text-white' : 'text-[#7b8492]')}
               aria-current={page === currentPage ? 'page' : undefined}
             >

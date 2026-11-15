@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { useSearchParams } from 'react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { MovieGrid } from '../components/movie-grid'
 import { Pagination } from '../components/pagination'
 import { StatusMessage } from '../components/status-message'
@@ -9,9 +9,16 @@ import { movieQueries, toMovie } from '../lib/tmdb'
 // TMDB는 page 500까지만 허용해요.
 const MAX_PAGE = 500
 
-export function MovieListPage() {
-  const [searchParams] = useSearchParams()
-  const page = Math.min(Math.max(Math.trunc(Number(searchParams.get('page'))) || 1, 1), MAX_PAGE)
+export const Route = createFileRoute('/')({
+  validateSearch: (search: Record<string, unknown>): { page?: number } => {
+    const page = Math.min(Math.max(Math.trunc(Number(search.page)) || 1, 1), MAX_PAGE)
+    return page > 1 ? { page } : {}
+  },
+  component: MovieListPage,
+})
+
+function MovieListPage() {
+  const { page = 1 } = Route.useSearch()
   const { data, isPending, isError, refetch } = useQuery(movieQueries.popular(page))
 
   useEffect(() => window.scrollTo(0, 0), [page])
