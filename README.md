@@ -1,5 +1,81 @@
 # UMCine 영화 페이지 미션 기록
 
+## 로그인 전용 폴더 · 남은 API 연결 미션
+
+<details open>
+<summary>필수 미션</summary>
+
+### 1. 로그인 전용 폴더 (Route Group + Layout Route)
+
+react-router를 TanStack Router 파일 기반 라우팅으로 옮겼습니다. 로그인 후에만 볼 수 있는 화면을 `(auth)` Route Group으로 묶었습니다. 괄호 폴더는 URL에 포함되지 않아 주소는 그대로 `/me`, `/me/edit`입니다.
+
+```text
+src/routes/
+├── __root.tsx          # 헤더 · 푸터 · <Outlet />
+├── index.tsx           # /
+├── search.tsx          # /search
+├── movies.$movieId.tsx # /movies/:movieId
+├── login.tsx · signup.tsx
+└── (auth)/
+    ├── route.tsx       # 공통 Layout Route: 로그인 확인 후 <Outlet />
+    └── me/
+        ├── index.tsx   # /me  (마이페이지)
+        └── edit.tsx    # /me/edit
+```
+
+```tsx
+// src/routes/(auth)/route.tsx
+export const Route = createFileRoute('/(auth)')({
+  beforeLoad: ({ location }) => {
+    if (!useAuthStore.getState().accessToken) throw redirect({ to: '/login', search: { redirect: location.href } })
+  },
+  component: () => <Outlet />,
+})
+```
+
+### 2. 남은 API 연결
+
+| 화면 | API | 캐시 키 | 변경 후 반영 |
+| --- | --- | --- | --- |
+| 마이페이지 | `GET /favorites` | `['favorites', 'list']` | 즐겨찾기 추가·해제 시 invalidate |
+| 영화 상세 | `GET /favorites/{movieId}` | `['favorites', 'status', movieId]` | — |
+| 영화 상세 | `POST /favorites`, `DELETE /favorites/{movieId}` | — | 상태는 `setQueryData`, 목록은 `invalidateQueries` |
+| 영화 상세 | `GET /members/{memberId}/ratings` | `['ratings', memberId]` | `select`로 현재 영화 평점만 사용 |
+| 영화 상세 | `POST /ratings`, `PATCH /ratings/{ratingId}`, `DELETE /ratings/{ratingId}` | — | `invalidateQueries`로 목록 다시 조회 |
+
+- `src/lib/api.ts`의 ky 인스턴스가 저장된 토큰을 `Authorization: Bearer`로 붙이고, 401 응답을 받으면 로그인 정보를 지웁니다.
+- 서버 공통 응답 `{ isSuccess, code, message, result }`에서 `result`만 꺼내고, 실패하면 서버의 `message`를 화면에 표시합니다.
+- 서버는 즐겨찾기의 `movieId`만 저장합니다. 마이페이지는 `useQueries`로 TMDB 상세를 불러와 포스터와 제목을 표시하며, 상세 화면과 같은 캐시를 함께 씁니다.
+- 로그인하지 않은 상태로 상세 화면에 들어가면 즐겨찾기·평점 대신 로그인 링크를 보여 주고, 로그인하면 원래 화면으로 돌아옵니다.
+- 로그아웃하면 `members`·`favorites`·`ratings` 캐시를 지워 다른 계정에 이전 데이터가 보이지 않게 합니다.
+- 로그인·회원가입·내 정보 조회/수정(`POST /auth/login`, `POST /members`, `GET·PATCH /members/me`)도 함께 연결하고, 더미 프로필 스토어를 삭제했습니다.
+
+백엔드(`11th_UMC_PE_WEB_BACKEND`, `week8-josh` 브랜치)에 즐겨찾기 API가 없어 추가했습니다. 평점 조회에 필요한 `memberId`를 로그인 응답에 포함하도록 했고, 테이블 생성 SQL은 `scripts/favorite.sql`에 있습니다.
+
+확인 결과: `pnpm build`, `pnpm lint`, `pnpm test` 통과, 백엔드 `./gradlew compileJava` 통과.
+
+</details>
+
+<details>
+<summary>선택 미션</summary>
+
+**`mutationOptions`**: 로그인, 회원가입, 내 정보 수정, 즐겨찾기, 평점 mutation을 `src/lib/api.ts`의 `authMutations`·`favoriteMutations`·`ratingMutations`에 모았습니다. 화면에서는 `useMutation(favoriteMutations.add(movieId))`처럼 호출만 하고, 화면 이동처럼 그 화면에만 필요한 동작은 `mutate(vars, { onSuccess })`로 넘깁니다.
+
+**`setQueryData` vs `invalidateQueries`**
+
+| | `setQueryData` | `invalidateQueries` |
+| --- | --- | --- |
+| 적용한 곳 | 즐겨찾기 여부, 내 정보 수정 | 즐겨찾기 목록, 평점 목록 |
+| 추가 요청 | 없음 | 활성 쿼리는 즉시 다시 GET, 비활성 쿼리는 다음에 화면을 열 때 GET |
+| 화면 갱신 | 응답 직후 캐시 값으로 바로 바뀜 | 다시 받은 서버 값으로 바뀜 |
+| 선택 기준 | 응답만으로 새 상태를 정확히 알 때 | 서버가 정하는 값(정렬, `updatedAt`, 다른 화면의 목록)이 바뀔 때 |
+
+즐겨찾기 버튼은 성공 여부만 알면 `isFavorite`를 확정할 수 있어서 `setQueryData`를 썼습니다. 평점은 수정 시각과 목록 정렬을 서버가 정하므로 `invalidateQueries`로 다시 받습니다.
+
+</details>
+
+---
+
 ## 로그인 · 내 정보 퍼블리싱 미션
 
 ### 필수 미션
