@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link } from '@tanstack/react-router'
 import { cn } from '../lib/cn'
 import { useBookmarkStore } from '../stores/bookmark-store'
 import type { Movie } from '../types/movie'
@@ -14,7 +14,7 @@ export function MovieCard({ movie }: MovieCardProps) {
     <article className="min-w-0">
       <div className="relative aspect-[178/204] overflow-hidden rounded-md bg-[#e7ecf3]">
         <span className="absolute inset-0 grid place-items-center font-extrabold text-[#9ea9b7]" aria-hidden="true">UMCine</span>
-        <Link to={`/movies/${movie.id}`} aria-label={`${movie.title} 상세 보기`} className="absolute inset-0 block">
+        <Link to="/movies/$movieId" params={{ movieId: String(movie.id) }} aria-label={`${movie.title} 상세 보기`} className="absolute inset-0 block">
           {movie.posterPath && <img src={movie.posterPath} alt={`${movie.title} 포스터`} loading="lazy" className="h-full w-full object-cover" onError={(event) => { event.currentTarget.hidden = true }} />}
         </Link>
         <button
@@ -28,7 +28,7 @@ export function MovieCard({ movie }: MovieCardProps) {
         </button>
       </div>
       <div className="pt-[6px]">
-        <h2 className="truncate text-xs leading-[1.5] font-bold text-[#26282d]"><Link to={`/movies/${movie.id}`}>{movie.title}</Link></h2>
+        <h2 className="truncate text-xs leading-[1.5] font-bold text-[#26282d]"><Link to="/movies/$movieId" params={{ movieId: String(movie.id) }}>{movie.title}</Link></h2>
         <p className="mt-[2px] text-[11px] leading-[1.4] text-[#969da8]">{movie.releaseDate}</p>
       </div>
     </article>

@@ -1,13 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { StatusMessage } from '../components/status-message'
 import { movieQueries, toMovie } from '../lib/tmdb'
 import { useBookmarkStore } from '../stores/bookmark-store'
 
-export function SearchPage() {
-  const [searchParams] = useSearchParams()
-  const query = (searchParams.get('query') ?? '').trim()
+export const Route = createFileRoute('/search')({
+  validateSearch: (search: Record<string, unknown>): { query?: string } => {
+    const query = typeof search.query === 'string' ? search.query.trim() : ''
+    return query ? { query } : {}
+  },
+  component: SearchPage,
+})
+
+function SearchPage() {
+  const { query = '' } = Route.useSearch()
   return <SearchContent key={query} query={query} />
 }
 
@@ -18,7 +25,7 @@ function SearchContent({ query }: { query: string }) {
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextQuery = input.trim()
-    navigate(nextQuery ? `/search?query=${encodeURIComponent(nextQuery)}` : '/search')
+    navigate({ to: '/search', search: nextQuery ? { query: nextQuery } : {} })
   }
 
   return (
@@ -69,14 +76,14 @@ function SearchResults({ query }: { query: string }) {
         <div className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
           {results.map((movie) => (
             <article key={movie.id} className="flex gap-3 border-b border-[#e5e9ee] py-5">
-              <Link to={`/movies/${movie.id}`} className="w-[88px] shrink-0 overflow-hidden rounded-md bg-[#e7ecf3]">
+              <Link to="/movies/$movieId" params={{ movieId: String(movie.id) }} className="w-[88px] shrink-0 overflow-hidden rounded-md bg-[#e7ecf3]">
                 {movie.posterPath && <img className="aspect-[2/3] h-full w-full object-cover" src={movie.posterPath} alt={`${movie.title} 포스터`} />}
               </Link>
               <div className="min-w-0">
-                <h3 className="text-sm font-bold"><Link to={`/movies/${movie.id}`} className="hover:text-[#2f73dc]">{movie.title}</Link></h3>
+                <h3 className="text-sm font-bold"><Link to="/movies/$movieId" params={{ movieId: String(movie.id) }} className="hover:text-[#2f73dc]">{movie.title}</Link></h3>
                 <p className="mt-1 text-xs text-[#6b7280]">{movie.originalTitle} · {movie.releaseDate}</p>
                 <p className="mt-3 line-clamp-3 text-xs leading-5 text-[#59606a]">{movie.overview}</p>
-                <Link to={`/movies/${movie.id}`} className="mt-3 inline-block text-xs font-bold text-[#2f73dc]">상세 보기 →</Link>
+                <Link to="/movies/$movieId" params={{ movieId: String(movie.id) }} className="mt-3 inline-block text-xs font-bold text-[#2f73dc]">상세 보기 →</Link>
                 <button
                   type="button"
                   aria-label={`${movie.title} 북마크 ${bookmarkedIds.includes(movie.id) ? '해제' : '추가'}`}
