@@ -34,7 +34,7 @@ export const errorMessage = (error: unknown) =>
 export interface LoginResult { memberId: number; nickname: string; accessToken: string }
 export interface MemberInfo { email: string; nickname: string; createdAt: string }
 export interface Favorite { favoriteId: number; movieId: number; createdAt: string }
-export interface FavoriteStatus { movieId: number; isFavorite: boolean }
+export interface FavoriteStatus { isFavorite: boolean }
 export interface Rating { ratingId: number; movieId: number; score: number; comment: string | null; createdAt: string; updatedAt: string }
 
 // ---------- 조회 (queryOptions) ----------
@@ -89,14 +89,14 @@ export const favoriteMutations = {
   add: (movieId: number) => mutationOptions({
     mutationFn: () => unwrap(api.post('favorites', { json: { movieId } }).json<ApiResponse<Favorite>>()),
     onSuccess: (_data, _vars, _result, { client }) => {
-      client.setQueryData(favoriteQueries.status(movieId).queryKey, { movieId, isFavorite: true })
+      client.setQueryData(favoriteQueries.status(movieId).queryKey, { isFavorite: true })
       return client.invalidateQueries({ queryKey: favoriteQueries.list().queryKey })
     },
   }),
   remove: (movieId: number) => mutationOptions({
     mutationFn: () => unwrap(api.delete(`favorites/${movieId}`).json<ApiResponse<null>>()),
     onSuccess: (_data, _vars, _result, { client }) => {
-      client.setQueryData(favoriteQueries.status(movieId).queryKey, { movieId, isFavorite: false })
+      client.setQueryData(favoriteQueries.status(movieId).queryKey, { isFavorite: false })
       return client.invalidateQueries({ queryKey: favoriteQueries.list().queryKey })
     },
   }),

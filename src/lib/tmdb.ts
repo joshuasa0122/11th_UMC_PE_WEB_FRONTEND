@@ -4,7 +4,7 @@ import type { Movie } from '../types/movie'
 
 export const tmdb = ky.create({
   prefix: 'https://api.themoviedb.org/3',
-  headers: { Authorization: `Bearer ${import.meta.env.VITE_TMDB_TOKEN}` },
+  headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_TMDB_TOKEN}` },
 })
 
 export interface TmdbMovie {
@@ -47,6 +47,10 @@ export function toMovie(movie: TmdbMovie): Movie {
 
 const get = <T>(path: string, params: Record<string, string>, signal: AbortSignal) =>
   tmdb.get(path, { searchParams: { language: 'ko-KR', ...params }, signal }).json<T>()
+
+// TMDB는 page 500까지만 허용해요.
+// Server page.tsx와 Client 화면이 함께 써요. 'use client' 파일에서 export하면 서버에서는 값이 아니라 클라이언트 참조가 돼서 여기 둬요.
+export const MAX_PAGE = 500
 
 export const isNotFound = (error: unknown) => error instanceof HTTPError && error.response.status === 404
 

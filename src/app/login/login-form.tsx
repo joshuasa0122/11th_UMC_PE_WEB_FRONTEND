@@ -1,18 +1,13 @@
+'use client'
+
 import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
-import { FormField } from '../components/form-field'
-import { authMutations, errorMessage } from '../lib/api'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { FormField } from '../../components/form-field'
+import { authMutations, errorMessage } from '../../lib/api'
 
-export const Route = createFileRoute('/login')({
-  // 같은 사이트 경로만 허용해요. //로 시작하면 다른 사이트로 나갈 수 있어서 막아요.
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
-    typeof search.redirect === 'string' && search.redirect.startsWith('/') && !search.redirect.startsWith('//') ? { redirect: search.redirect } : {},
-  component: LoginPage,
-})
-
-function LoginPage() {
-  const { redirect = '/' } = Route.useSearch()
+export function LoginForm({ redirect }: { redirect: string }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,7 +16,7 @@ function LoginPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    login.mutate({ email: email.trim(), password }, { onSuccess: () => router.history.push(redirect) })
+    login.mutate({ email: email.trim(), password }, { onSuccess: () => router.push(redirect) })
   }
 
   return (
@@ -33,7 +28,7 @@ function LoginPage() {
         <FormField label="비밀번호" icon="/icons/lock.svg" type="password" placeholder="비밀번호를 입력해 주세요" autoComplete="current-password" required value={password} onChange={(event) => { setPassword(event.target.value); login.reset() }} />
         <button type="submit" disabled={!email || !password || login.isPending} className="mt-2 w-full cursor-pointer rounded-md bg-[#2f73dc] py-3 text-sm font-bold text-white disabled:cursor-default disabled:opacity-40">{login.isPending ? '로그인 중...' : '로그인'}</button>
         {login.isError && <p role="alert" className="mt-4 text-center text-xs text-[#d64545]">{errorMessage(login.error)}</p>}
-        <p className="mt-4 text-center text-xs text-[#6b7280]">계정이 없나요? <Link to="/signup" className="font-bold text-[#2f73dc]">회원가입</Link></p>
+        <p className="mt-4 text-center text-xs text-[#6b7280]">계정이 없나요? <Link href="/signup" className="font-bold text-[#2f73dc]">회원가입</Link></p>
       </form>
     </main>
   )

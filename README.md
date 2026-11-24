@@ -1,5 +1,220 @@
 # UMCine 영화 페이지 미션 기록
 
+## TanStack Router → Next.js 마이그레이션 미션
+
+<details open>
+<summary>필수 미션</summary>
+
+### 1. 프로젝트 설정 (Vite → Next.js 16 App Router)
+
+| 기존 | 변경 |
+| --- | --- |
+| `vite`, `@vitejs/plugin-react`, `index.html`, `src/main.tsx` | `next`, `src/app/layout.tsx` |
+| `@tanstack/react-router`, `@tanstack/router-plugin`, `routeTree.gen.ts` | 폴더 기반 `src/app/**/page.tsx` |
+| `@tailwindcss/vite` | `@tailwindcss/postcss` + `postcss.config.mjs` |
+| `import.meta.env.VITE_TMDB_TOKEN` | `process.env.NEXT_PUBLIC_TMDB_TOKEN` (브라우저에서 TMDB를 부르므로 `NEXT_PUBLIC_`) |
+
+```text
+src/app/
+├── layout.tsx            # Server: <html>, 헤더 · 푸터, <Providers>
+├── providers.tsx         # Client: QueryClient, Devtools, 스토어 rehydrate
+├── page.tsx              # /            Server: searchParams.page 검증
+├── search/page.tsx       # /search      Server: searchParams.query 정리
+├── movies/[movieId]/page.tsx  # Server: params.movieId
+├── login/page.tsx        # /login       Server: redirect 검증(//evil.com 차단)
+├── signup/page.tsx       # Client
+├── not-found.tsx
+└── (auth)/
+    ├── layout.tsx        # Client: 로그인 확인 후 children
+    └── me/page.tsx · me/edit/page.tsx
+```
+
+### 2. TanStack Router API → Next.js API
+
+| TanStack Router | Next.js |
+| --- | --- |
+| `<Link to="/movies/$movieId" params={...}>` | `<Link href={`/movies/${id}`}>` (`next/link`) |
+| `<Link to="/" search={{ page }}>` | `<Link href={`/?page=${page}`}>` |
+| `useNavigate()`, `router.history.push()` | `useRouter().push()` (`next/navigation`) |
+| `useLocation()` | `usePathname()` |
+| `validateSearch` + `Route.useSearch()` | Server `page.tsx`의 `await searchParams` → props |
+| `Route.useParams()` | Server `page.tsx`의 `await params` → props |
+| `beforeLoad` + `throw redirect()` | `(auth)/layout.tsx`에서 `router.replace('/login?redirect=...')` |
+| `notFoundComponent` | `app/not-found.tsx` |
+| `createRouter({ scrollRestoration })` | Next 기본 동작 |
+
+`searchParams`는 Server Component에서 읽어 props로 넘겼습니다. Client에서 `useSearchParams()`를 쓰면 Suspense 경계가 필요하고, 검증 로직도 서버 한 곳에 모을 수 있습니다.
+
+### 3. 라이브러리 설정 오류 수정
+
+- **QueryClient**: 모듈 전역에 만들면 서버에서 요청끼리 캐시를 함께 쓰게 됩니다. `providers.tsx`에서 `useState(() => new QueryClient())`로 만듭니다.
+- **zustand persist**: 서버에는 `localStorage`가 없어 persist가 `.persist` API를 붙이지 않습니다. 빌드 중 `/me` 프리렌더에서 `Cannot read properties of undefined (reading 'onFinishHydration')`가 났습니다. 브라우저에서만 호출되는 함수 안에서 `useAuthStore.persist`에 접근하도록 고쳤습니다.
+- **Hydration mismatch**: 서버 HTML은 로그아웃 상태, 브라우저 첫 렌더는 로그인 상태라 서로 달라집니다. 두 스토어에 `skipHydration: true`를 주고, hydration이 끝난 뒤 `Providers`의 `useEffect`에서 `persist.rehydrate()`를 호출합니다.
+
+```ts
+// src/stores/auth-store.ts
+export const useAuthHydrated = () => useSyncExternalStore(
+  (onChange) => useAuthStore.persist.onFinishHydration(onChange),
+  () => useAuthStore.persist.hasHydrated(),
+  () => false, // 서버
+)
+```
+
+- **백엔드 CORS**: 개발 서버 주소가 Vite `localhost:5173`에서 Next `localhost:3000`으로 바뀌어 로그인 요청의 preflight가 403으로 막혔습니다. 백엔드 `WebConfig`의 `allowedOrigins`에 `http://localhost:3000`을 추가했습니다.
+
+### 4. Server / Client 경계
+
+- **Server**: `layout.tsx`, `page.tsx`(목록·검색·상세·로그인), `not-found.tsx`
+- **지시어 없음**: `pagination`, `status-message`, `form-field`는 훅이 없어 어느 쪽에서도 쓸 수 있습니다. 지금은 Client 화면에서만 import하므로 Client 번들에 포함됩니다.
+- **Client (`'use client'`)**: React Query·zustand·이벤트·`next/navigation` 훅을 쓰는 화면과 `header`, `movie-card`, `movie-grid`, `providers`, `(auth)/layout`
+- **경계를 넘는 상수**: 처음에는 `MAX_PAGE`를 `'use client'` 파일에서 export하고 Server `page.tsx`가 import했습니다. 서버에서는 이 값이 500이 아니라 클라이언트 참조라서 `page=NaN`으로 TMDB 400이 났습니다. Server와 Client가 함께 쓰는 값은 지시어 없는 `lib/tmdb.ts`로 옮겼습니다.
+- **브라우저 API**: `localStorage`(스토어, 카드 크기)는 `useEffect`/`rehydrate` 이후에만 읽고, `window.scrollTo`는 `useEffect` 안에서만 호출합니다. 토큰이 `localStorage`에만 있으므로 `(auth)` 접근 확인도 브라우저에서 합니다.
+
+확인 결과: `pnpm build`(8개 라우트, 타입 검사 포함), `pnpm lint`, `pnpm test` 통과. `pnpm start`로 `/`, `/?page=3`, `/search?query=…`, `/movies/550`, `/login`, `/me`, `/signup`은 200, 없는 경로는 404를 확인했습니다.
+
+</details>
+
+<details>
+<summary>트러블 슈팅</summary>
+
+### ⚡ 이슈 No.1 — 빌드 중 `/me` 프리렌더 실패 (zustand persist)
+
+**`이슈`**
+
+👉 `pnpm build`의 정적 페이지 생성 단계에서 `/me` 프리렌더가 실패했어요.
+
+```
+Error occurred prerendering page "/me". Read more: https://nextjs.org/docs/messages/prerender-error
+TypeError: Cannot read properties of undefined (reading 'onFinishHydration')
+    at <unknown> (src/stores/auth-store.ts:27:45)
+    at <unknown> (src/app/(auth)/layout.tsx:10:20)
+Export encountered an error on /(auth)/me/page: /me, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
+```
+
+**`원인`**
+
+👉 `'use client'` 컴포넌트도 첫 HTML을 만들 때는 서버에서 한 번 렌더링돼요. 서버에는 `localStorage`가 없어서 zustand `persist`가 스토어에 `.persist` API를 붙이지 않아요. 그런데 `useSyncExternalStore(useAuthStore.persist.onFinishHydration, ...)`처럼 렌더 중에 `useAuthStore.persist`를 바로 꺼내서 `undefined`를 읽었어요.
+
+**`해결`**
+
+👉 `.persist` 접근을 브라우저에서만 호출되는 함수 안으로 옮기고, 서버에서는 `getServerSnapshot`이 `false`를 돌려주게 했어요.
+
+```ts
+export const useAuthHydrated = () => useSyncExternalStore(
+  (onChange) => useAuthStore.persist.onFinishHydration(onChange),
+  () => useAuthStore.persist.hasHydrated(),
+  () => false, // 서버
+)
+```
+
+서버 HTML(로그아웃)과 브라우저 첫 렌더(로그인)가 달라지지 않도록 두 스토어에 `skipHydration: true`도 줬어요. 복원은 hydration이 끝난 뒤 `Providers`의 `useEffect`에서 `persist.rehydrate()`로 해요. 다시 `pnpm build`를 실행해 8개 라우트 생성을 확인했어요.
+
+**`배운 점`**
+
+👉 `'use client'`라도 서버에서 한 번 실행돼요. `localStorage`·`window`에 기대는 값은 렌더 본문이 아니라 effect나 브라우저에서만 불리는 콜백에서 읽어야 해요.
+
+**`참고 레퍼런스`**
+
+- Next.js - Prerender Error: https://nextjs.org/docs/messages/prerender-error
+- Zustand - Persisting store data (skipHydration): https://zustand.docs.pmnd.rs/integrations/persisting-store-data
+- React - useSyncExternalStore (getServerSnapshot): https://react.dev/reference/react/useSyncExternalStore
+
+---
+
+### ⚡ 이슈 No.2 — 영화 목록이 `page=NaN`으로 요청됨
+
+**`이슈`**
+
+👉 빌드는 성공했는데 브라우저에서 `/`를 열면 "영화 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."만 보였어요. 브라우저 네트워크 기록은 다음과 같았어요.
+
+```
+GET https://api.themoviedb.org/3/movie/popular?language=ko-KR&page=NaN → 400
+Failed to load resource: the server responded with a status of 400 ()
+```
+
+**`원인`**
+
+👉 `MAX_PAGE` 상수를 `'use client'` 파일(`movie-list-page.tsx`)에서 export하고, Server Component인 `app/page.tsx`에서 import했어요. Client 모듈의 export는 서버에서 실제 값이 아니라 **클라이언트 참조**로 바뀌어요. 그래서 `Math.min(page, MAX_PAGE)`가 `NaN`이 됐어요.
+
+**`해결`**
+
+👉 Server와 Client가 함께 쓰는 상수를 지시어가 없는 `src/lib/tmdb.ts`로 옮기고 양쪽에서 import했어요. 다시 빌드한 뒤 `/`, `/?page=3`, 검색, 상세 화면이 정상으로 표시되는 것을 확인했어요.
+
+**`배운 점`**
+
+👉 `'use client'` 파일은 서버에서 컴포넌트를 넘겨받는 용도로만 import해요. 상수·함수처럼 양쪽에서 쓰는 값은 지시어 없는 공용 모듈에 둬요. 타입 검사와 빌드를 통과해도 값이 런타임에 바뀌기 때문에 브라우저에서 꼭 확인해요.
+
+**`참고 레퍼런스`**
+
+- React - 'use client': https://react.dev/reference/rsc/use-client
+- Next.js - Server and Client Components: https://nextjs.org/docs/app/getting-started/server-and-client-components
+
+---
+
+### ⚡ 이슈 No.3 — 로그인 시 "서버와 통신하지 못했어요"
+
+**`이슈`**
+
+👉 Next.js로 옮긴 뒤 올바른 계정으로 로그인해도 "서버와 통신하지 못했어요. 잠시 후 다시 시도해 주세요."가 표시됐어요. curl로 `POST /auth/login`을 보내면 성공했어요.
+
+```
+OPTIONS http://localhost:8080/auth/login
+Origin: http://localhost:3000
+Access-Control-Request-Method: POST
+→ 403
+```
+
+**`원인`**
+
+👉 개발 서버 주소가 Vite `localhost:5173`에서 Next.js `localhost:3000`으로 바뀌었어요. 백엔드 CORS 설정은 `allowedOrigins("http://localhost:5173")`만 허용해서 브라우저의 preflight 요청이 403으로 막혔어요. ky는 응답을 받지 못해 `HTTPError`가 아닌 네트워크 오류를 냈고, 화면에는 기본 오류 문구가 나왔어요.
+
+**`해결`**
+
+👉 백엔드 `WebConfig`의 `allowedOrigins`에 `http://localhost:3000`을 추가하고 서버를 다시 켰어요. preflight가 200으로 바뀐 것을 확인했어요. `/me` 접속 → `/login?redirect=%2Fme` → 로그인 → `/me` 복귀까지 확인했어요.
+
+**`배운 점`**
+
+👉 프레임워크를 옮기면 개발 서버 포트도 바뀔 수 있어요. curl은 되는데 브라우저만 실패하면 CORS부터 의심하고 `OPTIONS` 응답을 확인해요.
+
+**`참고 레퍼런스`**
+
+- MDN - Preflight request: https://developer.mozilla.org/en-US/docs/Glossary/Preflight_request
+- Spring Framework - CORS: https://docs.spring.io/spring-framework/reference/web/webmvc-cors.html
+
+---
+
+### ⚡ 이슈 No.4 — `pnpm build` 명령을 찾지 못함
+
+**`이슈`**
+
+👉 터미널에서 `pnpm build`를 실행하자 다음 오류가 났어요.
+
+```
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+  × Command "build" not found
+```
+
+**`원인`**
+
+👉 터미널 위치가 프로젝트 폴더(`week0/umcine`)가 아니라 상위 폴더(`11기`)였어요. 그 폴더에는 `build` 스크립트가 있는 `package.json`이 없어요.
+
+**`해결`**
+
+👉 `cd week0/umcine`로 이동한 뒤 `pnpm build`를 다시 실행했어요.
+
+**`배운 점`**
+
+👉 여러 프로젝트를 한 작업 공간에 열어 둘 때는 명령 실행 전에 터미널 경로(`pwd`)를 먼저 확인해요.
+
+**`참고 레퍼런스`**
+
+- pnpm - run: https://pnpm.io/cli/run
+
+</details>
+
+---
+
 ## 로그인 전용 폴더 · 남은 API 연결 미션
 
 <details open>

@@ -1,16 +1,16 @@
+'use client'
+
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link, createFileRoute, useLocation } from '@tanstack/react-router'
-import { StatusMessage } from '../components/status-message'
-import { cn } from '../lib/cn'
-import { errorMessage, favoriteMutations, favoriteQueries, memberQueries, ratingMutations, type Rating } from '../lib/api'
-import { isNotFound, movieQueries, toMovie } from '../lib/tmdb'
-import { useAuthStore } from '../stores/auth-store'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { StatusMessage } from '../../../components/status-message'
+import { cn } from '../../../lib/cn'
+import { errorMessage, favoriteMutations, favoriteQueries, memberQueries, ratingMutations, type Rating } from '../../../lib/api'
+import { isNotFound, movieQueries, toMovie } from '../../../lib/tmdb'
+import { useAuthStore } from '../../../stores/auth-store'
 
-export const Route = createFileRoute('/movies/$movieId')({ component: MovieDetailPage })
-
-function MovieDetailPage() {
-  const { movieId } = Route.useParams()
+export function MovieDetailPage({ movieId }: { movieId: string }) {
   const { data, error, isPending, refetch } = useQuery(movieQueries.detail(movieId))
   const memberId = useAuthStore((state) => state.memberId)
 
@@ -32,7 +32,7 @@ function MovieDetailPage() {
         <img className="absolute inset-0 h-full w-full object-cover object-center" src={movie.backdropPath} alt="" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
         <div className="relative mx-auto flex h-full max-w-[1060px] flex-col justify-between px-5 py-5 min-[651px]:px-[58px]">
-          <Link to="/" className="text-xs font-semibold text-white hover:underline">‹ 영화 목록</Link>
+          <Link href="/" className="text-xs font-semibold text-white hover:underline">‹ 영화 목록</Link>
           <div>
             <h1 className="text-[26px] leading-tight font-extrabold tracking-[-.05em] min-[651px]:text-[34px]">{movie.title}</h1>
             <p className="mt-2 text-xs text-white/80">{movie.originalTitle}</p>
@@ -59,8 +59,8 @@ function MovieDetailPage() {
 }
 
 function LoginLink({ children }: { children: string }) {
-  const href = useLocation({ select: (location) => location.href })
-  return <Link to="/login" search={{ redirect: href }} className="mt-5 inline-block rounded bg-[#2f73dc] px-4 py-2 text-xs font-bold text-white">{children}</Link>
+  const pathname = usePathname()
+  return <Link href={`/login?${new URLSearchParams({ redirect: pathname })}`} className="mt-5 inline-block rounded bg-[#2f73dc] px-4 py-2 text-xs font-bold text-white">{children}</Link>
 }
 
 function FavoriteButton({ movieId }: { movieId: number }) {

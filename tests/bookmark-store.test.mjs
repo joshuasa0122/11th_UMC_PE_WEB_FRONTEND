@@ -12,7 +12,12 @@ test('북마크 추가·해제, 저장·복원, 삭제 후 초기화', async () 
     },
   })
   const key = 'umcine-bookmark-store'
-  const load = async (name) => (await import(`../src/stores/bookmark-store.ts?${name}`)).useBookmarkStore
+  // skipHydration이라 브라우저에서 Providers가 하는 것처럼 직접 rehydrate()해요.
+  const load = async (name) => {
+    const store = (await import(`../src/stores/bookmark-store.ts?${name}`)).useBookmarkStore
+    await store.persist.rehydrate()
+    return store
+  }
   try {
     const store = await load('initial')
     assert.deepEqual(store.getState().bookmarkedIds, [])
