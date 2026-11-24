@@ -1,4 +1,6 @@
-import { useState } from 'react'
+'use client'
+
+import { useEffect, useState } from 'react'
 import { cn } from '../lib/cn'
 import { MovieCard } from './movie-card'
 import type { Movie } from '../types/movie'
@@ -8,9 +10,12 @@ interface MovieGridProps {
 }
 
 export function MovieGrid({ movies }: MovieGridProps) {
-  const [cardSize, setCardSize] = useState(() =>
-    typeof window !== 'undefined' && localStorage.getItem('umcine-card-size') === 'large' ? 'large' : 'normal',
-  )
+  const [cardSize, setCardSize] = useState('normal')
+  // localStorage는 브라우저에만 있어서, 서버 HTML과 첫 렌더를 맞춘 뒤 저장된 값을 읽어요.
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- hydration 이후 외부 저장소(localStorage) 값과 맞추는 용도예요.
+    if (localStorage.getItem('umcine-card-size') === 'large') setCardSize('large')
+  }, [])
 
   return (
     <section aria-label="영화 목록">

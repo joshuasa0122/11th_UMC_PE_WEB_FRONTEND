@@ -1,12 +1,12 @@
+'use client'
+
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import Link from 'next/link'
 import { StatusMessage } from '../../../components/status-message'
 import { favoriteQueries, memberQueries } from '../../../lib/api'
 import { movieQueries, toMovie } from '../../../lib/tmdb'
 
-export const Route = createFileRoute('/(auth)/me/')({ component: MyPage })
-
-function MyPage() {
+export default function MyPage() {
   const me = useQuery(memberQueries.me())
   const favorites = useQuery(favoriteQueries.list())
   // 서버는 movieId만 저장해요. 제목·포스터는 상세 화면과 같은 TMDB 캐시를 함께 써요.
@@ -26,7 +26,7 @@ function MyPage() {
                 <p className="text-[13px] text-[#6b7280]">{me.data.email}</p>
                 <p className="mt-1 text-[11px] text-[#8a929f]">가입일 {me.data.createdAt.slice(0, 10).replaceAll('-', '.')}</p>
               </div>
-              <Link to="/me/edit" className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#dce2ea] px-4 py-2 text-xs font-bold hover:border-[#2f73dc]">
+              <Link href="/me/edit" className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#dce2ea] px-4 py-2 text-xs font-bold hover:border-[#2f73dc]">
                 <img className="h-4 w-4" src="/icons/edit.svg" alt="" />정보 수정
               </Link>
             </div>
@@ -43,7 +43,7 @@ function MyPage() {
             const movie = movies[index]?.data && toMovie(movies[index].data)
             return (
               <li key={favorite.favoriteId}>
-                <Link to="/movies/$movieId" params={{ movieId: String(favorite.movieId) }} className="block">
+                <Link href={`/movies/${favorite.movieId}`} className="block">
                   <div className="aspect-[2/3] overflow-hidden rounded-md bg-[#e7ecf3]">
                     {movie?.posterPath && <img className="h-full w-full object-cover" src={movie.posterPath} alt={`${movie.title} 포스터`} loading="lazy" />}
                   </div>

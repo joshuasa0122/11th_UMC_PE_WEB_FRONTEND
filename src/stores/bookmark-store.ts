@@ -19,6 +19,7 @@ export const useBookmarkStore = create<BookmarkState>()(
     {
       name: 'umcine-bookmark-store',
       storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
       partialize: (state) => ({ bookmarkedIds: state.bookmarkedIds }),
       merge: (persisted, current) => {
         const ids = (persisted as Partial<BookmarkState> | null)?.bookmarkedIds
